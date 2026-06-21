@@ -1,29 +1,52 @@
-import { Sequelize } from 'sequelize';
-import dotenv from 'dotenv';
+import { Sequelize } from "sequelize";
+import dotenv from "dotenv";
 
 dotenv.config();
+const isProduction = process.env.NODE_ENV === "production";
 
 const sequelize = new Sequelize(
-  process.env.DB_NAME || 'agrisubsidy_db',
-  process.env.DB_USER || 'postgres',
-  process.env.DB_PASSWORD || '',
+  process.env.DB_NAME || "agrisubsidy_db",
+  process.env.DB_USER || "postgres",
+  process.env.DB_PASSWORD || "",
   {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432'),
-    dialect: 'postgres',
+    host: process.env.DB_HOST || "localhost",
+    port: parseInt(process.env.DB_PORT || "5432"),
+    dialect: "postgres",
     logging: false,
-    pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
-    define: { timestamps: true, underscored: true, freezeTableName: true },
-  }
+
+    dialectOptions: isProduction
+      ? {
+          ssl: {
+            require: true,
+            rejectUnauthorized: false,
+          },
+        }
+      : {},
+
+    pool: {
+      max: 10,
+      min: 0,
+      acquire: 30000,
+      idle: 10000,
+    },
+
+    define: {
+      timestamps: true,
+      underscored: true,
+      freezeTableName: true,
+    },
+  },
 );
 
 export const connectDB = async (): Promise<void> => {
   try {
     await sequelize.authenticate();
-    console.log('✅ PostgreSQL connected via Sequelize');
+    console.log("✅ PostgreSQL connected via Sequelize");
   } catch (authErr: any) {
-    console.error('❌ Cannot connect to PostgreSQL:', authErr.message);
-    console.error('   Check DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD in .env');
+    console.error("❌ Cannot connect to PostgreSQL:", authErr.message);
+    console.error(
+      "   Check DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD in .env",
+    );
     throw authErr;
   }
 
@@ -60,7 +83,7 @@ export const connectDB = async (): Promise<void> => {
     `);
   } catch (dropErr: any) {
     // Non-fatal: table may not exist yet on first run
-    console.log('ℹ️  Constraint cleanup skipped (first run or no conflicts)');
+    console.log("ℹ️  Constraint cleanup skipped (first run or no conflicts)");
   }
 
   try {
@@ -76,16 +99,18 @@ export const connectDB = async (): Promise<void> => {
     `);
   } catch (migrateErr: any) {
     // Non-fatal on first run before users table exists
-    console.log('ℹ️  User column migration skipped:', migrateErr.message);
+    console.log("ℹ️  User column migration skipped:", migrateErr.message);
   }
 
   try {
     await sequelize.sync({ force: false, alter: false });
-    console.log('✅ All database tables synced successfully');
+    console.log("✅ All database tables synced successfully");
   } catch (syncErr: any) {
-    console.error('❌ Sequelize sync failed:', syncErr.message);
-    if (syncErr.original) console.error('   SQL:', syncErr.original.message);
-    console.error('\n💡 Try: DROP DATABASE agrisubsidy_db; CREATE DATABASE agrisubsidy_db;');
+    console.error("❌ Sequelize sync failed:", syncErr.message);
+    if (syncErr.original) console.error("   SQL:", syncErr.original.message);
+    console.error(
+      "\n💡 Try: DROP DATABASE agrisubsidy_db; CREATE DATABASE agrisubsidy_db;",
+    );
     throw syncErr;
   }
 };
