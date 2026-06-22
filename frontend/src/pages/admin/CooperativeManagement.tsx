@@ -61,7 +61,7 @@ export default function CooperativeManagement() {
                 {c.manager&&<p className="text-xs">Manager: <span className="font-medium text-gray-700">{c.manager.full_name}</span></p>}
               </div>
               <div className="flex gap-2 pt-3 border-t border-gray-100">
-                <button className="flex-1 flex items-center justify-center gap-1 text-xs text-agri-green hover:bg-green-50 py-1.5 rounded-lg"><Eye size={13}/>View Farmers</button>
+                <button className="flex-1 flex items-center justify-center gap-1 text-xs text-agri-green hover:bg-green-50 py-1.5 rounded-lg"><Eye size={13}/>View</button>
                 <button className="flex-1 flex items-center justify-center gap-1 text-xs text-gray-500 hover:bg-gray-50 py-1.5 rounded-lg"><Edit size={13}/>Edit</button>
               </div>
             </div>

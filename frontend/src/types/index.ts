@@ -108,6 +108,8 @@ export interface Notification {
   is_read: boolean;
   created_at: string;
   type?: string;
+  related_id?: string;
+  related_type?: string;
 }
 
 // ── Audit Log ─────────────────────────────────────────────────

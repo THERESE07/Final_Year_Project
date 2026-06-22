@@ -1,12 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, Check } from 'lucide-react';
 import { notificationsAPI } from '../../api/client';
+import { useAuth } from '../../contexts/AuthContext';
 import { QUERY_KEYS } from '../../constants';
 import { Notification } from '../../types';
+import { getNotificationRoute } from '../../utils/notificationRoutes';
 
 const NotificationBell: React.FC<{ linkTo?: string }> = ({ linkTo = '/notifications' }) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -40,6 +44,15 @@ const NotificationBell: React.FC<{ linkTo?: string }> = ({ linkTo = '/notificati
     qc.invalidateQueries({ queryKey: [QUERY_KEYS.NOTIFICATIONS_UNREAD] });
   };
 
+  const handleNotificationClick = async (n: Notification) => {
+    const route = getNotificationRoute(user?.role, n);
+    if (!n.is_read) await markRead(n.id);
+    if (route) {
+      setOpen(false);
+      navigate(route);
+    }
+  };
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -64,21 +77,38 @@ const NotificationBell: React.FC<{ linkTo?: string }> = ({ linkTo = '/notificati
           <div className="max-h-72 overflow-y-auto">
             {notifications.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-8">No notifications</p>
-            ) : notifications.map(n => (
-              <div key={n.id} className={`px-4 py-3 border-b border-gray-50 hover:bg-gray-50 ${!n.is_read ? 'bg-blue-50/40' : ''}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{n.title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+            ) : notifications.map(n => {
+              const route = getNotificationRoute(user?.role, n);
+              return (
+                <div
+                  key={n.id}
+                  role={route ? 'button' : undefined}
+                  tabIndex={route ? 0 : undefined}
+                  onClick={() => route && handleNotificationClick(n)}
+                  onKeyDown={e => route && e.key === 'Enter' && handleNotificationClick(n)}
+                  className={`px-4 py-3 border-b border-gray-50 hover:bg-gray-50 ${!n.is_read ? 'bg-blue-50/40' : ''} ${route ? 'cursor-pointer' : ''}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{n.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+                      {route && (
+                        <p className="text-xs text-agri-green mt-1">Click to view →</p>
+                      )}
+                    </div>
+                    {!n.is_read && (
+                      <button
+                        onClick={e => { e.stopPropagation(); markRead(n.id); }}
+                        className="p-1 text-gray-400 hover:text-agri-green flex-shrink-0"
+                        title="Mark read"
+                      >
+                        <Check size={14} />
+                      </button>
+                    )}
                   </div>
-                  {!n.is_read && (
-                    <button onClick={() => markRead(n.id)} className="p-1 text-gray-400 hover:text-agri-green flex-shrink-0" title="Mark read">
-                      <Check size={14} />
-                    </button>
-                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <Link to={linkTo} onClick={() => setOpen(false)} className="block text-center text-xs text-agri-green font-medium py-3 hover:bg-gray-50">
             View all notifications

@@ -97,7 +97,7 @@ const AdminLayout: React.FC = () => {
             <input className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-agri-green" placeholder="Search farmers, cooperatives, inputs..." />
           </div>
           <div className="flex items-center gap-3 ml-auto">
-            <NotificationBell linkTo="/admin/security-monitoring" />
+            <NotificationBell linkTo="/admin/notifications" />
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center"><User size={16} className="text-agri-green" /></div>
               <div className="hidden sm:block">

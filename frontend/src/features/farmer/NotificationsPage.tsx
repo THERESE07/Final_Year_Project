@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck, Trash2, DollarSign, Package, Info, Check } from 'lucide-react';
 import { useNotifications } from '../../hooks';
+import { useAuth } from '../../contexts/AuthContext';
 import { LoadingRows, QueryErrorBanner } from '../../components/common';
+import { getNotificationRoute } from '../../utils/notificationRoutes';
+import { Notification } from '../../types';
 
 const typeIcon = (type: string) => {
   const map: Record<string,{icon:any,color:string,bg:string}> = {
@@ -24,10 +28,18 @@ const timeAgo = (d: string) => {
 };
 
 export default function NotificationsPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<'all'|'unread'|'read'>('all');
   const { notifications, unreadCount, isLoading, isError, refetch, markRead, markAllRead } = useNotifications(30, tab);
 
   const filtered = tab==='all' ? notifications : tab==='unread' ? notifications.filter(n=>!n.is_read) : notifications.filter(n=>n.is_read);
+
+  const handleNotificationClick = (n: Notification) => {
+    const route = getNotificationRoute(user?.role, n);
+    if (!n.is_read) markRead.mutate(n.id);
+    if (route) navigate(route);
+  };
 
   return (
     <div className="space-y-6">
@@ -54,10 +66,18 @@ export default function NotificationsPage() {
         ) : (
           <div className="divide-y divide-gray-50">
             {filtered.map(n=>{
-              const ti = typeIcon(n.type);
+              const ti = typeIcon(n.type || '');
               const Icon = ti.icon;
+              const route = getNotificationRoute(user?.role, n);
               return (
-                <div key={n.id} className={`px-5 py-4 flex items-start gap-4 hover:bg-gray-50 ${!n.is_read?'bg-blue-50/30':''}`}>
+                <div
+                  key={n.id}
+                  role={route ? 'button' : undefined}
+                  tabIndex={route ? 0 : undefined}
+                  onClick={() => route && handleNotificationClick(n)}
+                  onKeyDown={e => route && e.key === 'Enter' && handleNotificationClick(n)}
+                  className={`px-5 py-4 flex items-start gap-4 hover:bg-gray-50 ${!n.is_read?'bg-blue-50/30':''} ${route ? 'cursor-pointer' : ''}`}
+                >
                   <div className={`w-10 h-10 ${ti.bg} rounded-xl flex items-center justify-center flex-shrink-0`}><Icon size={18} className={ti.color}/></div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
@@ -65,7 +85,10 @@ export default function NotificationsPage() {
                       <span className="text-xs text-gray-400 flex-shrink-0">{timeAgo(n.created_at)}</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">{n.message}</p>
-                    {!n.is_read&&<button onClick={()=>markRead.mutate(n.id)} disabled={markRead.isPending} className="text-xs text-agri-green mt-2 hover:underline">Mark as read</button>}
+                    {route && <p className="text-xs text-agri-green mt-1">Click to view →</p>}
+                    {!n.is_read && !route && (
+                      <button onClick={e => { e.stopPropagation(); markRead.mutate(n.id); }} disabled={markRead.isPending} className="text-xs text-agri-green mt-2 hover:underline">Mark as read</button>
+                    )}
                   </div>
                   {!n.is_read&&<div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"/>}
                 </div>

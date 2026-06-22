@@ -95,6 +95,7 @@ export default function App() {
               <Route path="export-reports" element={<ExportReports/>}/>
               <Route path="security-monitoring" element={<SecurityMonitoring/>}/>
               <Route path="system-settings" element={<SystemSettings/>}/>
+              <Route path="notifications" element={<NotificationsPage/>}/>
             </Route>
 
             <Route path="/farmer" element={<Guard roles={['farmer']}><FarmerLayout/></Guard>}>

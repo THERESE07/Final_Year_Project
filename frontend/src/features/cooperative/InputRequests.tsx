@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Package } from 'lucide-react';
 import { inputRequestsAPI, allocationsAPI } from '../../api/client';
@@ -22,7 +22,7 @@ export default function InputRequests() {
     queryFn: () => inputRequestsAPI.getAll({ status: statusFilter || undefined, limit: 20 }),
   });
 
-  const { data: inventoryData } = useQuery({
+  const { data: inventoryData, isLoading: inventoryLoading, refetch: refetchInventory } = useQuery({
     queryKey: ['coop-inventory'],
     queryFn: () => allocationsAPI.getInventory(),
     enabled: !!reviewTarget,
@@ -41,9 +41,10 @@ export default function InputRequests() {
     onError: (e: any) => toast.error(e.response?.data?.message || 'Action failed'),
   });
 
-  const inventory = (inventoryData as any)?.data || [];
+  const inventory: any[] = Array.isArray(inventoryData) ? inventoryData : (inventoryData as any)?.data || [];
+  const reviewInputId = reviewTarget?.input_id || reviewTarget?.input?.id;
   const coopStock = reviewTarget
-    ? inventory.find((i: any) => i.input_id === reviewTarget.input_id)
+    ? inventory.find((i: any) => i.input_id === reviewInputId)
     : null;
 
   const requests = ((data as any)?.data || []).filter((r: any) =>
@@ -61,6 +62,10 @@ export default function InputRequests() {
     setQuantity(String(request.quantity));
     setFeedback('');
   };
+
+  useEffect(() => {
+    if (reviewTarget) refetchInventory();
+  }, [reviewTarget, refetchInventory]);
 
   const submitReview = (action: 'approve' | 'reject') => {
     if (!feedback.trim()) { toast.error('Feedback is required'); return; }
@@ -165,13 +170,21 @@ export default function InputRequests() {
               {reviewTarget.reason && (
                 <p><span className="text-gray-500">Reason:</span> {reviewTarget.reason}</p>
               )}
-              {coopStock ? (
-                <p className="text-orange-600">
-                  <span className="text-gray-500">Cooperative stock remaining:</span>{' '}
-                  {coopStock.remaining_quantity.toLocaleString()} {coopStock.unit}
-                </p>
+              {inventoryLoading ? (
+                <p className="text-gray-500">Loading cooperative inventory...</p>
+              ) : coopStock ? (
+                <>
+                  <p className="text-orange-600">
+                    <span className="text-gray-500">Allocated to cooperative:</span>{' '}
+                    {parseFloat(String(coopStock.allocated_quantity)).toLocaleString()} {coopStock.unit}
+                  </p>
+                  <p className="text-orange-600">
+                    <span className="text-gray-500">Remaining stock:</span>{' '}
+                    {parseFloat(String(coopStock.remaining_quantity)).toLocaleString()} {coopStock.unit}
+                  </p>
+                </>
               ) : (
-                <p className="text-red-600">No cooperative stock available for this input</p>
+                <p className="text-red-600">No cooperative stock allocated for this input</p>
               )}
             </div>
 
@@ -200,7 +213,7 @@ export default function InputRequests() {
               <button onClick={() => submitReview('reject')} className="flex-1 py-2.5 border border-red-200 text-red-600 rounded-xl">Reject</button>
               <button
                 onClick={() => submitReview('approve')}
-                disabled={reviewMutation.isPending || !coopStock}
+                disabled={reviewMutation.isPending || inventoryLoading || !coopStock}
                 className="btn-primary flex-1 py-2.5 disabled:opacity-50"
               >
                 {reviewMutation.isPending ? 'Processing...' : 'Approve & Allocate'}

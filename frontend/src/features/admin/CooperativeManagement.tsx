@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Plus, Eye, Edit, Users, MapPin, X } from 'lucide-react';
+import { Search, Plus, Eye, Edit, Users, MapPin, X, Phone, Mail, User } from 'lucide-react';
 import { cooperativesAPI } from '../../api/client';
 import { useCooperatives } from '../../hooks';
 import { QueryErrorBanner } from '../../components/common';
@@ -17,7 +17,12 @@ export default function CooperativeManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [viewFarmersId, setViewFarmersId] = useState<string | null>(null);
-  const [farmersList, setFarmersList] = useState<any[]>([]);
+  const [viewDetail, setViewDetail] = useState<{
+    cooperative: any;
+    farmer_count: number;
+    farmers: any[];
+  } | null>(null);
+  const [loadingFarmers, setLoadingFarmers] = useState(false);
   const [form, setForm] = useState(emptyForm);
 
   const { coops, pagination, isLoading, isError, refetch } = useCooperatives(page, search);
@@ -76,6 +81,7 @@ export default function CooperativeManagement() {
       ...form,
       established_year: form.established_year ? parseInt(form.established_year) : undefined,
       contact_email: form.contact_email || undefined,
+      ...(editId ? {} : { registration_number: undefined }),
     };
     const parsed = parsePayload(cooperativePayloadSchema, payload);
     if (!parsed.success) { toast.error(parsed.message); return; }
@@ -84,14 +90,36 @@ export default function CooperativeManagement() {
   };
 
   const handleViewFarmers = async (id: string) => {
+    setViewFarmersId(id);
+    setViewDetail(null);
+    setLoadingFarmers(true);
     try {
-      const res = await cooperativesAPI.getFarmers(id);
-      setFarmersList((res as any) || []);
-      setViewFarmersId(id);
+      const res = await cooperativesAPI.getFarmers(id) as {
+        cooperative: any;
+        farmer_count: number;
+        farmers: any[];
+      };
+      setViewDetail(res);
     } catch {
-      toast.error('Failed to load farmers');
+      toast.error('Failed to load cooperative details');
+      setViewFarmersId(null);
+    } finally {
+      setLoadingFarmers(false);
     }
   };
+
+  const closeFarmersModal = () => {
+    setViewFarmersId(null);
+    setViewDetail(null);
+  };
+
+  const statusBadge = (s: string) => ({
+    active: 'badge-active',
+    pending: 'badge-pending',
+    pending_coop_approval: 'badge-pending',
+    rejected: 'badge-rejected',
+    suspended: 'badge-suspended',
+  }[s] || 'bg-gray-100 text-gray-600');
 
   const stats = (coopStats as {
     total_cooperatives?: number;
@@ -146,7 +174,7 @@ export default function CooperativeManagement() {
                 {c.manager&&<p className="text-xs">Manager: <span className="font-medium text-gray-700">{c.manager.full_name}</span></p>}
               </div>
               <div className="flex gap-2 pt-3 border-t border-gray-100">
-                <button onClick={()=>handleViewFarmers(c.id)} className="flex-1 flex items-center justify-center gap-1 text-xs text-agri-green hover:bg-green-50 py-1.5 rounded-lg"><Eye size={13}/>View Farmers</button>
+                <button onClick={()=>handleViewFarmers(c.id)} className="flex-1 flex items-center justify-center gap-1 text-xs text-agri-green hover:bg-green-50 py-1.5 rounded-lg"><Eye size={13}/>View</button>
                 <button onClick={()=>openEdit(c)} className="flex-1 flex items-center justify-center gap-1 text-xs text-gray-500 hover:bg-gray-50 py-1.5 rounded-lg"><Edit size={13}/>Edit</button>
               </div>
             </div>
@@ -163,7 +191,23 @@ export default function CooperativeManagement() {
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Name *</label><input className="input-field" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} placeholder="Cooperative name"/></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Reg. Number</label><input className="input-field" value={form.registration_number} onChange={e=>setForm(p=>({...p,registration_number:e.target.value}))}/></div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reg. Number</label>
+                  {editId ? (
+                    <input className="input-field bg-gray-50" value={form.registration_number || '—'} readOnly />
+                  ) : (
+                    <input
+                      className="input-field bg-gray-50 text-gray-500"
+                      value="Auto-generated on save"
+                      readOnly
+                    />
+                  )}
+                  {!editId && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Format: COOP-{form.established_year || new Date().getFullYear()}-0001
+                    </p>
+                  )}
+                </div>
                 <div><label className="block text-sm font-medium text-gray-700 mb-1">Est. Year</label><input type="number" className="input-field" value={form.established_year} onChange={e=>setForm(p=>({...p,established_year:e.target.value}))} placeholder="2020"/></div>
                 <div><label className="block text-sm font-medium text-gray-700 mb-1">Province *</label><select className="input-field" value={form.province} onChange={e=>setForm(p=>({...p,province:e.target.value}))}><option value="">Select</option>{['Kigali','Northern','Southern','Eastern','Western'].map(x=><option key={x}>{x}</option>)}</select></div>
                 <div><label className="block text-sm font-medium text-gray-700 mb-1">District *</label><input className="input-field" value={form.district} onChange={e=>setForm(p=>({...p,district:e.target.value}))}/></div>
@@ -182,19 +226,141 @@ export default function CooperativeManagement() {
         </div>
       )}
 
-      {viewFarmersId&&(
+      {viewFarmersId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b"><h2 className="font-bold text-lg">Cooperative Farmers</h2><button onClick={()=>setViewFarmersId(null)}><X size={20} className="text-gray-400"/></button></div>
-            <div className="p-6 space-y-3">
-              {farmersList.length===0?<p className="text-sm text-gray-400 text-center py-8">No farmers registered</p>
-              :farmersList.map((f:any)=>(
-                <div key={f.id} className="border border-gray-100 rounded-xl p-3">
-                  <p className="font-medium text-sm">{f.user?.full_name || f.full_name}</p>
-                  <p className="text-xs text-gray-400">{f.farmer_code||''} · {f.user?.phone || f.phone||''}</p>
-                </div>
-              ))}
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
+              <div>
+                <h2 className="font-bold text-lg">Cooperative Details & Farmers</h2>
+                {viewDetail && (
+                  <p className="text-sm text-gray-500 mt-0.5">{viewDetail.cooperative?.name}</p>
+                )}
+              </div>
+              <button onClick={closeFarmersModal}><X size={20} className="text-gray-400" /></button>
             </div>
+
+            {loadingFarmers ? (
+              <div className="p-12 text-center text-gray-400">Loading cooperative information...</div>
+            ) : viewDetail ? (
+              <div className="p-6 space-y-6">
+                {/* Cooperative registration info */}
+                <div className="bg-gray-50 rounded-xl p-5 space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{viewDetail.cooperative.name}</h3>
+                      {viewDetail.cooperative.registration_number && (
+                        <p className="text-xs text-agri-green font-mono mt-0.5">
+                          {viewDetail.cooperative.registration_number}
+                        </p>
+                      )}
+                    </div>
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium capitalize ${statusBadge(viewDetail.cooperative.status)}`}>
+                      {viewDetail.cooperative.status}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-gray-400">Location</p>
+                      <p className="text-gray-700 flex items-center gap-1 mt-0.5">
+                        <MapPin size={12} />
+                        {[viewDetail.cooperative.sector, viewDetail.cooperative.district, viewDetail.cooperative.province].filter(Boolean).join(', ') || '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Established</p>
+                      <p className="text-gray-700 mt-0.5">{viewDetail.cooperative.established_year || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Total Farmers</p>
+                      <p className="text-2xl font-bold text-agri-green mt-0.5">{viewDetail.farmer_count}</p>
+                    </div>
+                    {viewDetail.cooperative.contact_person && (
+                      <div>
+                        <p className="text-xs text-gray-400">Contact Person</p>
+                        <p className="text-gray-700 mt-0.5">{viewDetail.cooperative.contact_person}</p>
+                      </div>
+                    )}
+                    {viewDetail.cooperative.contact_phone && (
+                      <div>
+                        <p className="text-xs text-gray-400">Contact Phone</p>
+                        <p className="text-gray-700 mt-0.5 flex items-center gap-1"><Phone size={12} />{viewDetail.cooperative.contact_phone}</p>
+                      </div>
+                    )}
+                    {viewDetail.cooperative.contact_email && (
+                      <div>
+                        <p className="text-xs text-gray-400">Contact Email</p>
+                        <p className="text-gray-700 mt-0.5 flex items-center gap-1"><Mail size={12} />{viewDetail.cooperative.contact_email}</p>
+                      </div>
+                    )}
+                    {viewDetail.cooperative.manager && (
+                      <div className="col-span-2 sm:col-span-3">
+                        <p className="text-xs text-gray-400">Cooperative Leader</p>
+                        <p className="text-gray-700 mt-0.5 flex items-center gap-1">
+                          <User size={12} />
+                          {viewDetail.cooperative.manager.full_name}
+                          {viewDetail.cooperative.manager.phone && ` · ${viewDetail.cooperative.manager.phone}`}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {viewDetail.cooperative.description && (
+                    <div>
+                      <p className="text-xs text-gray-400">Description</p>
+                      <p className="text-sm text-gray-600 mt-0.5">{viewDetail.cooperative.description}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Farmers list */}
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Users size={16} className="text-agri-green" />
+                    Registered Farmers ({viewDetail.farmer_count})
+                  </h3>
+
+                  {viewDetail.farmers.length === 0 ? (
+                    <p className="text-sm text-gray-400 text-center py-8 border border-dashed border-gray-200 rounded-xl">
+                      No farmers registered under this cooperative yet
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto border border-gray-100 rounded-xl">
+                      <table className="w-full text-sm">
+                        <thead className="table-header">
+                          <tr>
+                            {['Farmer Name', 'Farmer ID', 'Phone', 'Email', 'Location', 'Farm Size', 'Status'].map(h => (
+                              <th key={h} className="table-th">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {viewDetail.farmers.map((f: any) => (
+                            <tr key={f.id} className="table-tr">
+                              <td className="table-td font-medium">{f.user?.full_name || '—'}</td>
+                              <td className="table-td text-xs font-mono text-agri-green">{f.farmer_code || '—'}</td>
+                              <td className="table-td text-xs text-gray-500">{f.user?.phone || '—'}</td>
+                              <td className="table-td text-xs text-gray-500">{f.user?.email || '—'}</td>
+                              <td className="table-td text-xs text-gray-500">
+                                {[f.sector, f.district].filter(Boolean).join(', ') || '—'}
+                              </td>
+                              <td className="table-td text-xs text-gray-500">
+                                {f.farm_size_hectares ? `${f.farm_size_hectares} ha` : '—'}
+                              </td>
+                              <td className="table-td">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${statusBadge(f.user?.status || '')}`}>
+                                  {f.user?.status?.replace(/_/g, ' ') || '—'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       )}
