@@ -7,6 +7,7 @@ import {
   saveRefreshToken, validateRefreshToken, revokeRefreshToken
 } from '../utils/jwt';
 import { notifyCoopLeader, notifyAdmins } from '../utils/notify';
+import { CooperativeService } from './cooperative.service';
 import logger from '../utils/logger';
 
 export class AuthService {
@@ -89,12 +90,12 @@ export class AuthService {
             transaction: t,
           });
           if (!coop && data.province) {
-            coop = await Cooperative.create({
+            coop = await CooperativeService.create({
               name: data.cooperative_name,
               province: data.province || '',
               district: data.district || '',
               sector: data.sector || '',
-            }, { transaction: t });
+            }, t);
           }
           cooperativeId = coop?.id ?? null;
         }

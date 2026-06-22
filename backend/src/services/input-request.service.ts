@@ -77,7 +77,7 @@ export class InputRequestService {
       limit,
       offset,
       include: [
-        { model: AgriculturalInput, as: 'input', attributes: ['name', 'unit', 'subsidized_price', 'unit_price'] },
+        { model: AgriculturalInput, as: 'input', attributes: ['id', 'name', 'unit', 'subsidized_price', 'unit_price'] },
         {
           model: Farmer, as: 'farmer',
           include: [{ model: User, as: 'user', attributes: ['full_name', 'phone', 'email'] }],

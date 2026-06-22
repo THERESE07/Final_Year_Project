@@ -10,6 +10,7 @@ import { Op } from 'sequelize';
 import sequelize from '../config/database';
 import { Cooperative, User, Farmer } from '../models/associations';
 import { FarmerApprovalService } from '../services/approval.service';
+import { CooperativeService } from '../services/cooperative.service';
 import { sendSuccess, sendError, buildPagination } from '../utils/response';
 import { AuthenticatedRequest, CooperativeQuery } from '../types';
 
@@ -82,7 +83,7 @@ export const CooperativeController = {
    */
   create: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const coop = await Cooperative.create(req.body);
+      const coop = await CooperativeService.create(req.body);
       sendSuccess(res, 'Cooperative created', coop, 201);
     } catch (err: any) {
       sendError(res, err.message, 400);
@@ -95,12 +96,10 @@ export const CooperativeController = {
    */
   update: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const coop = await Cooperative.findByPk(req.params.id);
-      if (!coop) return sendError(res, 'Cooperative not found', 404);
-      await coop.update(req.body);
+      const coop = await CooperativeService.update(req.params.id, req.body);
       sendSuccess(res, 'Cooperative updated', coop);
     } catch (err: any) {
-      sendError(res, err.message);
+      sendError(res, err.message, err.message === 'Cooperative not found' ? 404 : 400);
     }
   },
 
@@ -150,10 +149,19 @@ export const CooperativeController = {
 
   /**
    * GET /cooperatives/:id/farmers
-   * Lists all farmers belonging to a cooperative.
+   * Cooperative profile + member list for admin view.
    */
   getFarmers: async (req: Request, res: Response) => {
     try {
+      const coop = await Cooperative.findByPk(req.params.id, {
+        include: [{
+          model: User,
+          as: 'manager',
+          attributes: ['id', 'full_name', 'email', 'phone', 'status'],
+        }],
+      });
+      if (!coop) return sendError(res, 'Cooperative not found', 404);
+
       const farmers = await Farmer.findAll({
         where: { cooperative_id: req.params.id },
         include: [{
@@ -161,8 +169,14 @@ export const CooperativeController = {
           as: 'user',
           attributes: { exclude: ['password_hash', 'pin_hash'] },
         }],
+        order: [[{ model: User, as: 'user' }, 'full_name', 'ASC']],
       });
-      sendSuccess(res, 'Cooperative farmers retrieved', farmers);
+
+      sendSuccess(res, 'Cooperative farmers retrieved', {
+        cooperative: coop,
+        farmer_count: farmers.length,
+        farmers,
+      });
     } catch (err: any) {
       sendError(res, err.message);
     }
